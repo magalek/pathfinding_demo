@@ -2,39 +2,30 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Data;
+using Game;
 using Managers;
 using Pathfinding;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Utility;
 
 namespace Map
 {
     public class MapManager : MonoManager<MapManager>
     {
+        public MapConfig Config;
         public int MapWidth { get; private set; }
         public int MapHeight { get; private set; }
-        
-        private List<Tile> tiles = new List<Tile>();
 
-        private CancellationTokenSource cancellationToken;
+        public IReadOnlyList<Tile> AllTiles => tiles;
+
+        private List<Tile> tiles = new List<Tile>();
 
         protected override void OnAwake()
         {
-            Initialize(10, 10);
-            
-        }
-
-        public async void StartPath()
-        {
-            cancellationToken = new CancellationTokenSource();
-            var result = await new Path(tiles[2], tiles[99]).Calculate(cancellationToken);
-            Debug.Log(result.Successful);
-        }
-        
-        public void Initialize(int mapWidth, int mapHeight)
-        {
-            MapWidth = mapWidth;
-            MapHeight = mapHeight;
+            MapWidth = Config.MapDimensions.x;
+            MapHeight = Config.MapDimensions.y;
             CreateTiles();
         }
 
@@ -55,17 +46,12 @@ namespace Map
             {
                 for (int y = 0; y < MapHeight; y++)
                 {
-                    var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    cube.transform.parent = transform;
-                    cube.transform.position = new Vector3(x, 0, y);
-                    tiles.Add(new Tile(x, y, cube.GetComponent<MeshRenderer>()));
+                    var tileMesh = Instantiate(Config.TilePrefab);
+                    tileMesh.transform.parent = transform;
+                    tileMesh.transform.position = new Vector3(x, 0, y);
+                    tiles.Add(new Tile(x, y, tileMesh.GetComponent<MeshRenderer>()));
                 }
             }
-        }
-
-        private void OnDestroy()
-        {
-            cancellationToken?.Cancel();
         }
     }
 }

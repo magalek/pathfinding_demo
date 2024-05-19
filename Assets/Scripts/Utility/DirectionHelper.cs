@@ -12,6 +12,7 @@ namespace Utility
                 Direction.Right => Vector2Int.right,
                 Direction.Down => Vector2Int.down,
                 Direction.Left => Vector2Int.left,
+                _ => Vector2Int.zero
             };
         }
     }

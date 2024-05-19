@@ -1,15 +1,16 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Managers;
 using UnityEngine;
 using Utility;
 
 namespace Map
 {
-    public class Tile 
+    public class Tile
     {
+        public event Action BecameBlocked;
+        
+        public readonly Vector3 WalkablePosition;
+        
         public readonly Vector2Int Position;
 
         public bool Blocked { get; private set; }
@@ -23,21 +24,29 @@ namespace Map
             Position = new Vector2Int(x, y);
             manager = MapManager.Current;
             Renderer = renderer;
+            WalkablePosition = new Vector3(x, renderer.transform.localScale.y / 2, y);
         }
 
-        public Tile(Vector2Int position, MeshRenderer renderer) : this(position.x, position.y, renderer) { }
-        
         public void ChangeBlockedState()
         {
             Blocked = !Blocked;
-            ChangeColor(Blocked ? Color.black : Color.white);
+            if (Blocked)
+            {
+                Renderer.material = MapManager.Current.Config.BlockedMaterial;
+                BecameBlocked?.Invoke();
+            }
+            else
+                Renderer.material = MapManager.Current.Config.NormalMaterial;
         }
-        
 
-        public void ChangeColor(Color color)
+        public void SetAsPath() => Renderer.material = MapManager.Current.Config.PathMaterial;
+        public void SetAsBroken()
         {
-            Renderer.material.color = color;
+            if (Blocked) return;
+            Renderer.material = MapManager.Current.Config.BrokenMaterial;
         }
+
+        public void ResetMaterial() => Renderer.material = MapManager.Current.Config.NormalMaterial;
 
         public IEnumerable<Tile> GetNeighbours()
         {

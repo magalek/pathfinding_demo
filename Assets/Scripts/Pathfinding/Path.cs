@@ -1,32 +1,50 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Game;
 using Map;
+using UI;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace Pathfinding
 {
     public class Path
     {
+        public event Action Invalidated;
+        public event Action Broken;
+        
         private readonly Node StartNode;
         private readonly Node EndNode;
 
         private readonly HashSet<Node> openSet = new HashSet<Node>();
         private readonly HashSet<Node> closedSet = new HashSet<Node>();
 
+        private readonly CancellationTokenSource cancellationToken = new CancellationTokenSource();
+        
         public Path(Tile startTile, Tile endTile)
         {
             StartNode = new Node(startTile);
             EndNode = new Node(endTile);
 
             openSet.Add(StartNode);
+            GameManager.Current.Destroyed += Cancel;
         }
-        
-        public async Task<PathResult> Calculate(CancellationTokenSource cancellationToken)
+
+        public void Cancel() => cancellationToken?.Cancel();
+
+        public async Task<PathResult> Calculate()
         {
             if (StartNode == EndNode) return PathResult.Completed;
 
+            foreach (var tile in MapManager.Current.AllTiles)
+            {
+                if (!tile.Blocked) tile.ResetMaterial();
+            }
+            
             Node currentNode = null;
             
             while (openSet.Count > 0 && currentNode != EndNode)
@@ -41,23 +59,29 @@ namespace Pathfinding
                 openSet.Remove(currentNode);
                 closedSet.Add(currentNode);
                 CalculateNodeNeighbours(currentNode);
-                await Task.Delay(10);
-                ColorNodes();
             }
-            return currentNode != EndNode ? PathResult.Failed : new PathResult(true, ConstructTilesQueue(currentNode));
+            GameManager.Current.Destroyed -= Cancel;
+            return currentNode != EndNode ? PathResult.Failed : new PathResult(true, this, EndNode.Tile, ConstructTilesQueue(currentNode));
         }
 
-        private static Queue<Tile> ConstructTilesQueue(Node currentNode)
+        private Queue<Tile> ConstructTilesQueue(Node currentNode)
         {
             var temporaryList = new List<Tile>();
 
+            temporaryList.Add(currentNode.Tile);
+            currentNode.Invalidated += OnNodeInvalidated;
             var parentNode = currentNode.Parent;
-            currentNode.Tile.ChangeColor(Color.blue);
-            while (parentNode != null)
+            while (parentNode != null && parentNode != StartNode)
             {
-                parentNode.Tile.ChangeColor(Color.blue);
+                parentNode.Invalidated += OnNodeInvalidated;
                 temporaryList.Add(parentNode.Tile);
                 parentNode = parentNode.Parent;
+            }
+
+            foreach (var tile in temporaryList)
+            {
+                if (GameManager.Current.Options.PathDrawingOption.Value) tile.SetAsPath();
+                 
             }
 
             temporaryList.Reverse();
@@ -65,12 +89,10 @@ namespace Pathfinding
             return queue;
         }
 
-        private void ColorNodes()
+        private void OnNodeInvalidated(Node node)
         {
-            foreach (var node in openSet)
-            {
-                node.Tile.ChangeColor(Color.green);
-            }
+            if (node == EndNode) Broken?.Invoke();
+            else Invalidated?.Invoke();
         }
 
         private void CalculateNodeNeighbours(Node parentNode)
@@ -108,6 +130,12 @@ namespace Pathfinding
                 }
             }
             return bestNode;
+        }
+
+        ~Path()
+        {
+            GameManager.Current.Destroyed -= Cancel;
+            Cancel();
         }
     }
 }
