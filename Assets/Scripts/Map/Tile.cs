@@ -18,8 +18,6 @@ namespace Map
 
         private readonly MeshRenderer Renderer;
 
-        private CancellationTokenSource cancelationToken;
-        
         public Tile(int x, int y, MeshRenderer renderer)
         {
             Position = new Vector2Int(x, y);
@@ -40,16 +38,6 @@ namespace Map
         {
             Renderer.material.color = color;
         }
-        
-        public async void ChangeColor(Color color, int durationMs)
-        {
-            var material = Renderer.material;
-            var lastColor = material.color;
-            material.color = color;
-            cancelationToken = new CancellationTokenSource();
-            await Task.Delay(durationMs, cancelationToken.Token);
-            material.color = lastColor;
-        }
 
         public IEnumerable<Tile> GetNeighbours()
         {
@@ -57,11 +45,6 @@ namespace Map
             yield return manager.GetTile(Position, Direction.Right);
             yield return manager.GetTile(Position, Direction.Down);
             yield return manager.GetTile(Position, Direction.Left);
-        }
-        
-        ~Tile()
-        {
-            cancelationToken?.Cancel();
         }
     }
 }
