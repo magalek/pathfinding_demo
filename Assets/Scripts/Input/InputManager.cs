@@ -11,7 +11,7 @@ namespace Input
     public class InputManager : MonoManager<InputManager>
     {
         public event Action<Tile> SelectedTile;
-        
+
         private bool mouseOverUI;
 
         private void Update()
@@ -37,6 +37,7 @@ namespace Input
             if (mouseOverUI) return null;
             var ray = Camera.main.ScreenPointToRay(UnityEngine.Input.mousePosition);
             Physics.Raycast(ray, out RaycastHit hit);
+            if (hit.transform == null) return null;
             var vector = new Vector2Int(Mathf.FloorToInt(hit.point.x + 0.5f), Mathf.FloorToInt(hit.point.z + 0.5f));
             return MapManager.Current.GetTile(vector);
         }

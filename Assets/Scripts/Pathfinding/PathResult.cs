@@ -31,9 +31,9 @@ namespace Pathfinding
         {
             Successful = successful;
             TilesQueue = tilesQueue;
-            Path = path;
+            Path = path ?? Path.Empty;
             Destination = destination;
-            Path.Broken += OnPathBroken;
+            if (Path != null) Path.Broken += OnPathBroken;
         }
 
         private void OnPathBroken()

@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Threading.Tasks;
 using Input;
 using Map;
@@ -9,61 +10,93 @@ namespace Player
 {
     public class PlayerMovement : MonoBehaviour
     {
-        public Tile CurrentTile { get; private set; }
-
-        public bool IsMoving { get; private set; }
-
-        private Animator animator;
+        private const float FALL_TIME = 1;
+        
         private static readonly int SpeedAnimatorProperty = Animator.StringToHash("Speed");
-
-        private bool moveCancelRequested;
-
-        private Tile nextTile;
+        private static readonly int FreeFallProperty = Animator.StringToHash("FreeFall");
+        private static readonly int GroundedProperty = Animator.StringToHash("Grounded");
+        
+        private Animator animator;
+        
         private PathResult currentPath;
+        private Tile nextTile;
+        private Tile currentTile;
+        private bool isMoving;
+        private bool moveCancelRequested;
+        private bool canMove;
+
+        private Coroutine movementCoroutine;
 
         private void Awake()
         {
             animator = GetComponent<Animator>();
+            StartCoroutine(PlayStartAnimationsCoroutine());
+        }
+
+        private IEnumerator PlayStartAnimationsCoroutine()
+        {
+            var endPosition = new Vector3(0, 0.5f, 0);
+            var startPosition = endPosition + (Vector3.up * 10);
+            float t = 0;
+            animator.SetBool(FreeFallProperty, true);
+            while (t < FALL_TIME)
+            {
+                t += Time.deltaTime;
+                transform.position = Vector3.Lerp(startPosition, endPosition, t / FALL_TIME);
+                yield return null;
+            }
+            animator.SetBool(FreeFallProperty, false);
+            animator.SetBool(GroundedProperty, true);
+            canMove = true;
         }
 
         private void Start()
         {
-            CurrentTile = MapManager.Current.GetTile(Vector2Int.zero);
+            currentTile = MapManager.Current.GetTile(Vector2Int.zero);
             InputManager.Current.SelectedTile += OnTileSelected;
         }
         
         public async void StartMovement(Tile tile)
         {
+            if (!canMove) return;
             currentPath = await RecalculatePath(tile);
+            if (!currentPath.Successful) return;
             currentPath.Invalidated += OnPathInvalidated;
             currentPath.Broken += OnPathBroken;
-            await WaitForMoveToFinish();
-            StartCoroutine(Move(currentPath));
+            await WaitForMovementEnd();
+            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
+            movementCoroutine = StartCoroutine(Move(currentPath));
+        }
+
+        private async Task WaitForMovementEnd()
+        {
+            while (isMoving)
+            {
+                await Task.Yield();
+            }
         }
 
         private IEnumerator Move(PathResult result)
         {
-            yield return new WaitWhile(() => IsMoving);
             animator.SetFloat(SpeedAnimatorProperty, 0);
             while (result.TilesQueue.Count > 0)
             {
-                IsMoving = true;
+                isMoving = true;
                 nextTile = result.TilesQueue.Dequeue();
                 float t = 0;
                 animator.SetFloat(SpeedAnimatorProperty, 2);
                 while (t < 1)
                 {
-                    
-                    var lastPosition = transform.position;
-                    transform.position = Vector3.Lerp(CurrentTile.WalkablePosition, nextTile.WalkablePosition, t);
+                    transform.position = Vector3.Lerp(currentTile.WalkablePosition, nextTile.WalkablePosition, t);
+                    nextTile.SetAsVisited();
                     t += Time.deltaTime * 5;
-                    var direction = (transform.position - lastPosition);
+                    var direction = (nextTile.WalkablePosition - currentTile.WalkablePosition);
                     direction.y = 0;
                     direction.Normalize();
                     transform.rotation = Quaternion.LookRotation(direction);
                     yield return null;
                 }
-                CurrentTile = nextTile;
+                currentTile = nextTile;
                 if (moveCancelRequested)
                 {
                     moveCancelRequested = false;
@@ -71,25 +104,32 @@ namespace Player
                 }
             }
             animator.SetFloat(SpeedAnimatorProperty, 0);
-            IsMoving = false;
+            isMoving = false;
         }
         
         private void OnTileSelected(Tile tile)
         {
+            if (tile == null) return;
+            if (isMoving && tile == currentPath.Destination) return;
             StartMovement(tile);
         }
 
         private async Task<PathResult> RecalculatePath(Tile tile)
         {
+            if (isMoving && nextTile == tile)
+            {
+                Debug.Log("No recalculation needed");
+                return currentPath;
+            }
             RequestMovementCancel();
             PathResult result;
-            if (IsMoving)
+            if (isMoving)
             {
-                result = await new Path(nextTile ?? CurrentTile, tile).Calculate();
+                result = await new Path(nextTile ?? currentTile, tile).Calculate();
             }
             else
             {
-                result = await new Path(CurrentTile, tile).Calculate();
+                result = await new Path(currentTile, tile).Calculate();
             }
 
             return result;
@@ -97,27 +137,17 @@ namespace Player
 
         private void RequestMovementCancel()
         {
-            if (IsMoving) moveCancelRequested = true;
-        }
-
-        private async Task WaitForMoveToFinish()
-        {
-            while (IsMoving)
-            {
-                await Task.Yield();
-            }
+            if (isMoving) moveCancelRequested = true;
         }
 
         private void OnPathInvalidated()
         {
-            Debug.Log(nameof(OnPathInvalidated));
             currentPath.Invalidated -= OnPathInvalidated;
             StartMovement(currentPath.Destination);
         }
         
         private void OnPathBroken()
         {
-            Debug.Log(nameof(OnPathBroken));
             currentPath.Broken -= OnPathBroken;
             RequestMovementCancel();
         }

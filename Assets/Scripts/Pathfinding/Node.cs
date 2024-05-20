@@ -23,7 +23,7 @@ namespace Pathfinding
         public Node(Tile tile)
         {
             Tile = tile;
-            Tile.BecameBlocked += OnTileBecameBlocked;
+            if (Tile != null) Tile.BecameBlocked += OnTileBecameBlocked;
         }
 
         public void SetParent(Node parent)
@@ -36,11 +36,5 @@ namespace Pathfinding
         public static bool operator ==(Node a, Node b) => a?.Tile == b?.Tile;
 
         public static bool operator !=(Node a, Node b) => !(a == b);
-
-        ~Node()
-        {
-            Tile.BecameBlocked -= OnTileBecameBlocked;
-            Invalidated = null;
-        }
     }
 }

@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Game;
 using Map;
-using UI;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -14,6 +12,8 @@ namespace Pathfinding
 {
     public class Path
     {
+        public static Path Empty => new Path(null, null);
+        
         public event Action Invalidated;
         public event Action Broken;
         
@@ -68,7 +68,7 @@ namespace Pathfinding
         {
             var temporaryList = new List<Tile>();
 
-            temporaryList.Add(currentNode.Tile);
+            if (currentNode.Tile != null) temporaryList.Add(currentNode.Tile);
             currentNode.Invalidated += OnNodeInvalidated;
             var parentNode = currentNode.Parent;
             while (parentNode != null && parentNode != StartNode)

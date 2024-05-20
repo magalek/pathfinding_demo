@@ -40,6 +40,7 @@ namespace Map
         }
 
         public void SetAsPath() => Renderer.material = MapManager.Current.Config.PathMaterial;
+        public void SetAsVisited() => Renderer.material = MapManager.Current.Config.VisitedMaterial;
         public void SetAsBroken()
         {
             if (Blocked) return;
