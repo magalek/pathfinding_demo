@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Threading.Tasks;
+using Game;
 using Input;
 using Map;
 using Pathfinding;
@@ -88,7 +89,7 @@ namespace Player
                 while (t < 1)
                 {
                     transform.position = Vector3.Lerp(currentTile.WalkablePosition, nextTile.WalkablePosition, t);
-                    nextTile.SetAsVisited();
+                    if (GameManager.Current.Options.PathDrawingOption.Value) nextTile.SetAsVisited();
                     t += Time.deltaTime * 5;
                     var direction = (nextTile.WalkablePosition - currentTile.WalkablePosition);
                     direction.y = 0;

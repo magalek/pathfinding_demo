@@ -11,6 +11,8 @@ namespace Game
         
         public readonly Options Options = new Options();
 
+        public void Quit() => Application.Quit();
+
         private void OnDestroy()
         {
             Destroyed?.Invoke();
